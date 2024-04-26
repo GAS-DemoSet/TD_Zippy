@@ -6,10 +6,16 @@
 #include "GameFramework/Character.h"
 
 
-bool UTD_CharacterMovementComponent::FSavedMove_TD_Character::CanCombineWith(const FSavedMovePtr& NewMove,
+UTD_CharacterMovementComponent::FTD_SavedMove_Character::FTD_SavedMove_Character()
+	: Super()
+	, Saved_bWantsToSprint(0)
+{
+}
+
+bool UTD_CharacterMovementComponent::FTD_SavedMove_Character::CanCombineWith(const FSavedMovePtr& NewMove,
                                                                              ACharacter* InCharacter, float MaxDelta) const
 {
-	const FSavedMove_TD_Character* Temp_SaveMove = static_cast<FSavedMove_TD_Character*>(NewMove.Get());
+	const FTD_SavedMove_Character* Temp_SaveMove = static_cast<FTD_SavedMove_Character*>(NewMove.Get());
 
 	if (Saved_bWantsToSprint != Temp_SaveMove->Saved_bWantsToSprint)
 	{
@@ -19,14 +25,14 @@ bool UTD_CharacterMovementComponent::FSavedMove_TD_Character::CanCombineWith(con
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
 
-void UTD_CharacterMovementComponent::FSavedMove_TD_Character::Clear()
+void UTD_CharacterMovementComponent::FTD_SavedMove_Character::Clear()
 {
 	Super::Clear();
 
 	Saved_bWantsToSprint = 0;
 }
 
-uint8 UTD_CharacterMovementComponent::FSavedMove_TD_Character::GetCompressedFlags() const
+uint8 UTD_CharacterMovementComponent::FTD_SavedMove_Character::GetCompressedFlags() const
 {
 	uint8 Result = Super::GetCompressedFlags();
 
@@ -38,7 +44,7 @@ uint8 UTD_CharacterMovementComponent::FSavedMove_TD_Character::GetCompressedFlag
 	return Result;
 }
 
-void UTD_CharacterMovementComponent::FSavedMove_TD_Character::SetMoveFor(ACharacter* C, float InDeltaTime,
+void UTD_CharacterMovementComponent::FTD_SavedMove_Character::SetMoveFor(ACharacter* C, float InDeltaTime,
 	FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData)
 {
 	Super::SetMoveFor(C, InDeltaTime, NewAccel, ClientData);
@@ -49,7 +55,7 @@ void UTD_CharacterMovementComponent::FSavedMove_TD_Character::SetMoveFor(ACharac
 	}
 }
 
-void UTD_CharacterMovementComponent::FSavedMove_TD_Character::PrepMoveFor(ACharacter* C)
+void UTD_CharacterMovementComponent::FTD_SavedMove_Character::PrepMoveFor(ACharacter* C)
 {
 	Super::PrepMoveFor(C);
 
@@ -57,6 +63,16 @@ void UTD_CharacterMovementComponent::FSavedMove_TD_Character::PrepMoveFor(AChara
 	{
 		TempCMC->Safe_bWantsToSprint = Saved_bWantsToSprint;
 	}
+}
+
+UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Client_Character::FTD_NetworkPredictionData_Client_Character(const UCharacterMovementComponent& ClientMovement)
+	: Super(ClientMovement)
+{
+}
+
+FSavedMovePtr UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Client_Character::AllocateNewMove()
+{
+	return FSavedMovePtr(new UTD_CharacterMovementComponent::FTD_SavedMove_Character());
 }
 
 // Sets default values for this component's properties
@@ -69,6 +85,20 @@ UTD_CharacterMovementComponent::UTD_CharacterMovementComponent()
 	// ...
 }
 
+FNetworkPredictionData_Client* UTD_CharacterMovementComponent::GetPredictionData_Client() const
+{
+	check(PawnOwner != nullptr)
+
+	if (ClientPredictionData == nullptr)
+	{
+		UTD_CharacterMovementComponent* MutableThis = const_cast<UTD_CharacterMovementComponent*>(this);
+
+		MutableThis->ClientPredictionData = new FTD_NetworkPredictionData_Client_Character(*this);
+		MutableThis->ClientPredictionData->MaxSmoothNetUpdateDist = 92.f;
+		MutableThis->ClientPredictionData->NoSmoothNetUpdateDist = 140.f; 
+	}
+	return ClientPredictionData;
+}
 
 // Called when the game starts
 void UTD_CharacterMovementComponent::BeginPlay()
@@ -87,5 +117,10 @@ void UTD_CharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick T
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	// ...
+}
+
+void UTD_CharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
+{
+	Super::UpdateFromCompressedFlags(Flags);
 }
 
