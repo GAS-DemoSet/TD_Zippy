@@ -3,6 +3,7 @@
 
 #include "TD_CharacterMovementComponent.h"
 
+#include "TD_LogDefine.h"
 #include "GameFramework/Character.h"
 
 
@@ -75,6 +76,11 @@ FSavedMovePtr UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Client_C
 	return FSavedMovePtr(new UTD_CharacterMovementComponent::FTD_SavedMove_Character());
 }
 
+UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Server_Character::FTD_NetworkPredictionData_Server_Character(const UCharacterMovementComponent& ServerMovement)
+	: Super(ServerMovement)
+{
+}
+
 // Sets default values for this component's properties
 UTD_CharacterMovementComponent::UTD_CharacterMovementComponent()
 {
@@ -100,6 +106,28 @@ FNetworkPredictionData_Client* UTD_CharacterMovementComponent::GetPredictionData
 	return ClientPredictionData;
 }
 
+FNetworkPredictionData_Server* UTD_CharacterMovementComponent::GetPredictionData_Server() const
+{
+	check(PawnOwner != nullptr)
+	
+	if (ServerPredictionData == nullptr)
+	{
+		UTD_CharacterMovementComponent* MutableThis = const_cast<UTD_CharacterMovementComponent*>(this);
+		MutableThis->ServerPredictionData = new FTD_NetworkPredictionData_Server_Character(*this);
+	}
+	return ServerPredictionData;
+}
+
+void UTD_CharacterMovementComponent::SprintPressed()
+{
+	Safe_bWantsToSprint = true;
+}
+
+void UTD_CharacterMovementComponent::SprintReleased()
+{
+	Safe_bWantsToSprint = false;
+}
+
 // Called when the game starts
 void UTD_CharacterMovementComponent::BeginPlay()
 {
@@ -122,5 +150,23 @@ void UTD_CharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick T
 void UTD_CharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 {
 	Super::UpdateFromCompressedFlags(Flags);
+}
+
+void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity)
+{
+	Super::OnMovementUpdated(DeltaSeconds, OldLocation, OldVelocity);
+
+	if (MovementMode == MOVE_Walking)
+	{
+		if (Safe_bWantsToSprint)
+		{
+			MaxWalkSpeed = Sprint_MaxWalkSpeed;
+			UE_LOG(TD_Log, Warning, TEXT("1: %f"), MaxWalkSpeed);
+		}
+		else
+		{
+			MaxWalkSpeed = Walk_MaxWalkSpeed;
+		}
+	}
 }
 

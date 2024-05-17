@@ -7,6 +7,7 @@
 #include "Logging/LogMacros.h"
 #include "TD_ZippyCharacter.generated.h"
 
+class UTD_CharacterMovementComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
@@ -19,6 +20,9 @@ UCLASS(config=Game)
 class ATD_ZippyCharacter : public ACharacter
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UTD_CharacterMovementComponent* TD_CharacterMovementComponent;
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -45,7 +49,7 @@ class ATD_ZippyCharacter : public ACharacter
 	UInputAction* LookAction;
 
 public:
-	ATD_ZippyCharacter();
+	ATD_ZippyCharacter(const FObjectInitializer& ObjectInitializer);
 	
 
 protected:
