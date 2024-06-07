@@ -13,8 +13,7 @@ UTD_CharacterMovementComponent::FTD_SavedMove_Character::FTD_SavedMove_Character
 {
 }
 
-bool UTD_CharacterMovementComponent::FTD_SavedMove_Character::CanCombineWith(const FSavedMovePtr& NewMove,
-                                                                             ACharacter* InCharacter, float MaxDelta) const
+bool UTD_CharacterMovementComponent::FTD_SavedMove_Character::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
 	const FTD_SavedMove_Character* Temp_SaveMove = static_cast<FTD_SavedMove_Character*>(NewMove.Get());
 
@@ -52,6 +51,7 @@ void UTD_CharacterMovementComponent::FTD_SavedMove_Character::SetMoveFor(ACharac
 
 	if (UTD_CharacterMovementComponent* TempCMC = Cast<UTD_CharacterMovementComponent>(C->GetCharacterMovement()))
 	{
+		//UE_LOG(TD_Log, Warning, TEXT("SetMoveFor:: %i"), (int32)TempCMC->GetOwner()->GetLocalRole());
 		Saved_bWantsToSprint = TempCMC->Safe_bWantsToSprint;
 	}
 }
@@ -62,6 +62,7 @@ void UTD_CharacterMovementComponent::FTD_SavedMove_Character::PrepMoveFor(AChara
 
 	if (UTD_CharacterMovementComponent* TempCMC = Cast<UTD_CharacterMovementComponent>(C->GetCharacterMovement()))
 	{
+		//UE_LOG(TD_Log, Warning, TEXT("PrepMoveFor:: %i"), (int32)TempCMC->GetOwner()->GetLocalRole());
 		TempCMC->Safe_bWantsToSprint = Saved_bWantsToSprint;
 	}
 }
@@ -87,7 +88,6 @@ UTD_CharacterMovementComponent::UTD_CharacterMovementComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
-
 	// ...
 }
 
@@ -128,6 +128,15 @@ void UTD_CharacterMovementComponent::SprintReleased()
 	Safe_bWantsToSprint = false;
 }
 
+void UTD_CharacterMovementComponent::CrouchPressed()
+{
+	bWantsToCrouch = !bWantsToCrouch;
+}
+
+void UTD_CharacterMovementComponent::CrouchReleased()
+{
+}
+
 // Called when the game starts
 void UTD_CharacterMovementComponent::BeginPlay()
 {
@@ -150,6 +159,8 @@ void UTD_CharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick T
 void UTD_CharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 {
 	Super::UpdateFromCompressedFlags(Flags);
+
+	Safe_bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 }
 
 void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity)
@@ -161,12 +172,14 @@ void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const
 		if (Safe_bWantsToSprint)
 		{
 			MaxWalkSpeed = Sprint_MaxWalkSpeed;
-			UE_LOG(TD_Log, Warning, TEXT("1: %f"), MaxWalkSpeed);
+			UE_LOG(TD_Log, Warning, TEXT("11::%s : %f--%i"), *GetOwner()->GetName(), MaxWalkSpeed, (int32)GetOwner()->GetLocalRole());
 		}
 		else
 		{
 			MaxWalkSpeed = Walk_MaxWalkSpeed;
+			UE_LOG(TD_Log, Warning, TEXT("22::%s : %f--%i"), *GetOwner()->GetName(), MaxWalkSpeed, (int32)GetOwner()->GetLocalRole());
 		}
 	}
+	UE_LOG(TD_Log, Warning, TEXT("--------------------------------------------"))
 }
 

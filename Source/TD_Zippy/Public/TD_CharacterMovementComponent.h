@@ -40,7 +40,7 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 
 	class FTD_NetworkPredictionData_Server_Character : public FNetworkPredictionData_Server_Character
 	{
-		typedef FTD_NetworkPredictionData_Server_Character Super;
+		typedef FNetworkPredictionData_Server_Character Super;
 
 	public:
 		FTD_NetworkPredictionData_Server_Character(const UCharacterMovementComponent& ServerMovement);
@@ -60,10 +60,14 @@ public:
 	/** 触发冲刺 */
 	UFUNCTION(BlueprintCallable)
 	void SprintPressed();
-
 	/** 结束冲刺 */
 	UFUNCTION(BlueprintCallable)
 	void SprintReleased();
+
+	UFUNCTION(BlueprintCallable)
+	void CrouchPressed();
+	UFUNCTION(BlueprintCallable)
+	void CrouchReleased();
 
 protected:
 	// ~Begin UActorComponent Interface
