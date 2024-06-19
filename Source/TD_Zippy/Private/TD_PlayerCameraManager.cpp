@@ -16,6 +16,7 @@ void ATD_PlayerCameraManager::UpdateViewTarget(FTViewTarget& OutVT, float DeltaT
 {
 	Super::UpdateViewTarget(OutVT, DeltaTime);
 
+	// 当玩家蹲下时，平滑偏移相机镜头
 	if (ATD_ZippyCharacter* ZippyCharacter = Cast<ATD_ZippyCharacter>(GetOwningPlayerController()->GetPawn()))
 	{
 		UTD_CharacterMovementComponent* ZMC = ZippyCharacter->GetTD_CharacterMovement();
