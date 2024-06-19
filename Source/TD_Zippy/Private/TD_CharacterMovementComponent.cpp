@@ -88,6 +88,7 @@ UTD_CharacterMovementComponent::UTD_CharacterMovementComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
+	NavAgentProps.bCanCrouch = true;
 	// ...
 }
 
@@ -172,14 +173,11 @@ void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const
 		if (Safe_bWantsToSprint)
 		{
 			MaxWalkSpeed = Sprint_MaxWalkSpeed;
-			UE_LOG(TD_Log, Warning, TEXT("11::%s : %f--%i"), *GetOwner()->GetName(), MaxWalkSpeed, (int32)GetOwner()->GetLocalRole());
 		}
 		else
 		{
 			MaxWalkSpeed = Walk_MaxWalkSpeed;
-			UE_LOG(TD_Log, Warning, TEXT("22::%s : %f--%i"), *GetOwner()->GetName(), MaxWalkSpeed, (int32)GetOwner()->GetLocalRole());
 		}
 	}
-	UE_LOG(TD_Log, Warning, TEXT("--------------------------------------------"))
 }
 
