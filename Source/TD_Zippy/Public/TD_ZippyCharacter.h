@@ -75,5 +75,7 @@ public:
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 	FORCEINLINE UTD_CharacterMovementComponent* GetTD_CharacterMovement() const { return TD_CharacterMovementComponent; }
+
+	FCollisionQueryParams GetIgnoreCharacterParams() const;
 };
 
