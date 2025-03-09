@@ -115,3 +115,10 @@ FNetworkPredictionData_Server* UTD_CharacterMovementComponent::GetPredictionData
 	return ServerPredictionData;
 	// return Super::GetPredictionData_Server();
 }
+
+void UTD_CharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
+{
+	Super::UpdateFromCompressedFlags(Flags);
+
+	Safe_bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+}

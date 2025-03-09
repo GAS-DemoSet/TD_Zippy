@@ -63,6 +63,7 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		FTD_NetworkPredictionData_Server_Character(const UCharacterMovementComponent& ServerMovement);
 	};
 
+
 	/**
 	 * Begin
 	 * 以下为安全得移动属性变量，可以放心在移动函数中使用
@@ -81,5 +82,8 @@ protected:
 	/** 重写预测 */
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	virtual FNetworkPredictionData_Server* GetPredictionData_Server() const override;
+
+	/** 从已保存的 move 中解压缩 flag 并相应地设置 state。请参阅 FSavedMove_Character。 */
+	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	// ~End UCharacterMovementComponent Interface
 };
