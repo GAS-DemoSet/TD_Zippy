@@ -89,6 +89,10 @@ public:
 	/** 结束冲刺 */
 	UFUNCTION(BlueprintCallable)
 	void SprintReleased();
+
+	/** 触发蹲伏 */
+	UFUNCTION(BlueprintCallable)
+	void CrouchPressed();
 	/////////////////////////////// End ///////////////////////////////
 
 protected:

@@ -50,7 +50,8 @@ class ATD_ZippyCharacter : public ACharacter
 
 public:
 	ATD_ZippyCharacter(const FObjectInitializer& ObjectInitializer);
-	
+
+	UTD_CharacterMovementComponent* GetTD_CharacterMovement() const { return TD_CharacterMovementComponent; }
 
 protected:
 

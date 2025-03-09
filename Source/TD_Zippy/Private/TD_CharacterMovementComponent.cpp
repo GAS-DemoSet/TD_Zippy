@@ -84,6 +84,10 @@ UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Server_Character::FTD_
 
 UTD_CharacterMovementComponent::UTD_CharacterMovementComponent()
 {
+	PrimaryComponentTick.bCanEverTick = true;
+
+	// 允许角色蹲伏状态
+	NavAgentProps.bCanCrouch = true;
 }
 
 void UTD_CharacterMovementComponent::SprintPressed()
@@ -94,6 +98,11 @@ void UTD_CharacterMovementComponent::SprintPressed()
 void UTD_CharacterMovementComponent::SprintReleased()
 {
 	Safe_bWantsToSprint = false;
+}
+
+void UTD_CharacterMovementComponent::CrouchPressed()
+{
+	bWantsToCrouch = !bWantsToCrouch;
 }
 
 FNetworkPredictionData_Client* UTD_CharacterMovementComponent::GetPredictionData_Client() const
