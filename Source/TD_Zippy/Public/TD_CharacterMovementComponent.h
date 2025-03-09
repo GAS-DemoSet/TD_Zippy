@@ -44,6 +44,25 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		virtual void PrepMoveFor(ACharacter* C) override;
 	};
 
+	class FTD_NetworkPredictionData_Client_Character : public FNetworkPredictionData_Client_Character
+	{
+		typedef FNetworkPredictionData_Client_Character Super;
+		
+	public:
+		FTD_NetworkPredictionData_Client_Character(const UCharacterMovementComponent& ClientMovement);
+
+		/** 分配新的已保存移动。如果子类想要使用自定义移动类，则应覆盖此项。 */
+		virtual FSavedMovePtr AllocateNewMove() override;
+	};
+
+	class FTD_NetworkPredictionData_Server_Character : public FNetworkPredictionData_Server_Character
+	{
+		typedef FNetworkPredictionData_Server_Character Super;
+
+	public:
+		FTD_NetworkPredictionData_Server_Character(const UCharacterMovementComponent& ServerMovement);
+	};
+
 	/**
 	 * Begin
 	 * 以下为安全得移动属性变量，可以放心在移动函数中使用
@@ -56,4 +75,11 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 
 public:
 	UTD_CharacterMovementComponent();
+
+protected:
+	// ~Begin UCharacterMovementComponent Interface
+	/** 重写预测 */
+	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
+	virtual FNetworkPredictionData_Server* GetPredictionData_Server() const override;
+	// ~End UCharacterMovementComponent Interface
 };

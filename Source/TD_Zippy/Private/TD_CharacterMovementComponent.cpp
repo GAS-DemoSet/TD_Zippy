@@ -65,3 +65,53 @@ void UTD_CharacterMovementComponent::FTD_SavedMove_Character::PrepMoveFor(AChara
 		TempCMC->Safe_bWantsToSprint = Saved_bWantsToSprint;
 	}
 }
+
+UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Client_Character::FTD_NetworkPredictionData_Client_Character(const UCharacterMovementComponent& ClientMovement)
+	: Super(ClientMovement)
+{
+}
+
+FSavedMovePtr UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Client_Character::AllocateNewMove()
+{
+	return MakeShared<FTD_SavedMove_Character>();
+	// return FSavedMovePtr(new FTD_SavedMove_Character());
+}
+
+UTD_CharacterMovementComponent::FTD_NetworkPredictionData_Server_Character::FTD_NetworkPredictionData_Server_Character(const UCharacterMovementComponent& ServerMovement)
+	: Super(ServerMovement)
+{
+}
+
+UTD_CharacterMovementComponent::UTD_CharacterMovementComponent()
+{
+}
+
+FNetworkPredictionData_Client* UTD_CharacterMovementComponent::GetPredictionData_Client() const
+{
+	check(PawnOwner != nullptr)
+
+	if (ClientPredictionData == nullptr)
+	{
+		UTD_CharacterMovementComponent* MutableThis = const_cast<UTD_CharacterMovementComponent*>(this);
+
+		MutableThis->ClientPredictionData = new FTD_NetworkPredictionData_Client_Character(*this);
+		MutableThis->ClientPredictionData->MaxSmoothNetUpdateDist = 92.f;
+		MutableThis->ClientPredictionData->NoSmoothNetUpdateDist = 140.f; 
+	}
+	return ClientPredictionData;
+	
+	// return Super::GetPredictionData_Client();
+}
+
+FNetworkPredictionData_Server* UTD_CharacterMovementComponent::GetPredictionData_Server() const
+{
+	check(PawnOwner != nullptr)
+	
+	if (ServerPredictionData == nullptr)
+	{
+		UTD_CharacterMovementComponent* MutableThis = const_cast<UTD_CharacterMovementComponent*>(this);
+		MutableThis->ServerPredictionData = new FTD_NetworkPredictionData_Server_Character(*this);
+	}
+	return ServerPredictionData;
+	// return Super::GetPredictionData_Server();
+}
