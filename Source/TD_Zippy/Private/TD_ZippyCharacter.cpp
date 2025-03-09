@@ -10,14 +10,18 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "TD_CharacterMovementComponent.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 //////////////////////////////////////////////////////////////////////////
 // ATD_ZippyCharacter
 
-ATD_ZippyCharacter::ATD_ZippyCharacter()
+ATD_ZippyCharacter::ATD_ZippyCharacter(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UTD_CharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
+	TD_CharacterMovementComponent = Cast<UTD_CharacterMovementComponent>(GetCharacterMovement());
+	
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		

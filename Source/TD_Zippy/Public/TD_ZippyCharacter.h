@@ -12,6 +12,7 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+class UTD_CharacterMovementComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -44,8 +45,11 @@ class ATD_ZippyCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UTD_CharacterMovementComponent* TD_CharacterMovementComponent;
+
 public:
-	ATD_ZippyCharacter();
+	ATD_ZippyCharacter(const FObjectInitializer& ObjectInitializer);
 	
 
 protected:
