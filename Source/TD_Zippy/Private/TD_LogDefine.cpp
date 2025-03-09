@@ -1,0 +1,4 @@
+﻿#include "TD_LogDefine.h"
+
+DEFINE_LOG_CATEGORY(TD_Log);
+DEFINE_LOG_CATEGORY(TD_Log_CMC);
