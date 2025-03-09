@@ -86,6 +86,16 @@ UTD_CharacterMovementComponent::UTD_CharacterMovementComponent()
 {
 }
 
+void UTD_CharacterMovementComponent::SprintPressed()
+{
+	Safe_bWantsToSprint = true;
+}
+
+void UTD_CharacterMovementComponent::SprintReleased()
+{
+	Safe_bWantsToSprint = false;
+}
+
 FNetworkPredictionData_Client* UTD_CharacterMovementComponent::GetPredictionData_Client() const
 {
 	check(PawnOwner != nullptr)
@@ -121,4 +131,21 @@ void UTD_CharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 	Super::UpdateFromCompressedFlags(Flags);
 
 	Safe_bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+}
+
+void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity)
+{
+	Super::OnMovementUpdated(DeltaSeconds, OldLocation, OldVelocity);
+	
+	if (MovementMode == MOVE_Walking)
+	{
+		if (Safe_bWantsToSprint)
+		{
+			MaxWalkSpeed = Sprint_MaxWalkSpeed;
+		}
+		else
+		{
+			MaxWalkSpeed = Walk_MaxWalkSpeed;
+		}
+	}
 }

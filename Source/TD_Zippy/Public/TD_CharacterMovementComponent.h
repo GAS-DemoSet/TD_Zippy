@@ -77,6 +77,20 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 public:
 	UTD_CharacterMovementComponent();
 
+	/**
+	 * Begin
+	 * 以下为非安全移动函数：
+	 * 1、以下函数仅能在客户端调用
+	 * 2、以下函数未经过 RPC 同步，所以仅能更改安全得移动属性（安全移动属性会主动同步）
+	 */
+	/** 触发冲刺 */
+	UFUNCTION(BlueprintCallable)
+	void SprintPressed();
+	/** 结束冲刺 */
+	UFUNCTION(BlueprintCallable)
+	void SprintReleased();
+	/////////////////////////////// End ///////////////////////////////
+
 protected:
 	// ~Begin UCharacterMovementComponent Interface
 	/** 重写预测 */
@@ -85,5 +99,19 @@ protected:
 
 	/** 从已保存的 move 中解压缩 flag 并相应地设置 state。请参阅 FSavedMove_Character。 */
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
+	/**
+	 * 在移动更新结束时触发的事件。如果启用了有范围的移动更新（bEnableScopedMovementUpdates），则这是在这样的范围内。
+	 * 如果不需要，请改为绑定到 CharacterOwner 的 OnMovementUpdated 事件，因为该事件是在限定范围的移动更新后触发的。
+	 */
+	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
 	// ~End UCharacterMovementComponent Interface
+
+protected:
+	/** 冲刺时最大速度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Sprint", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
+	float Sprint_MaxWalkSpeed;
+
+	/** 行走最大速度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Sprint", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
+	float Walk_MaxWalkSpeed;
 };
