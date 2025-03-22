@@ -96,6 +96,18 @@ void ATD_ZippyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	}
 }
 
+FCollisionQueryParams ATD_ZippyCharacter::GetIgnoreCharacterParams() const
+{
+	FCollisionQueryParams Params;
+
+	TArray<AActor*> CharacterChildren;
+	GetAllChildActors(CharacterChildren);
+	Params.AddIgnoredActors(CharacterChildren);
+	Params.AddIgnoredActor(this);
+
+	return Params;
+}
+
 void ATD_ZippyCharacter::Move(const FInputActionValue& Value)
 {
 	// input is a Vector2D

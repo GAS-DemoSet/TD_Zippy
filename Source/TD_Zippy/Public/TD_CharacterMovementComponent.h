@@ -6,6 +6,16 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TD_CharacterMovementComponent.generated.h"
 
+UENUM(BlueprintType)
+enum ETD_CustomMovementMode : int
+{
+	CMOVE_None			UMETA(Hidden),
+	CMOVE_Slide			UMETA(DisplayName = "Slide"),
+	CMOVE_MAX			UMETA(Hidden),
+};
+
+class ATD_ZippyCharacter;
+
 /**
  * 
  */
@@ -23,6 +33,8 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		
 	public:
 		uint8 Saved_bWantsToSprint : 1;
+		
+		uint8 Saved_bPrevWantsToCrouch:1;
 
 	public:
 
@@ -70,7 +82,10 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 	 * 移动函数中不可使用非安全移动变量
 	 */
 	/** 是否想要冲刺 */
-	bool Safe_bWantsToSprint;
+	bool Safe_bWantsToSprint = false;
+
+	/**  */
+	bool Safe_bPrevWantsToCrouch = false;
 	/////////////////////////////// End ///////////////////////////////
 	
 
@@ -95,6 +110,15 @@ public:
 	void CrouchPressed();
 	/////////////////////////////// End ///////////////////////////////
 
+	/** 是否为自定义模式移动 */
+	UFUNCTION(BlueprintCallable)
+	bool IsCustomMovementMode(ETD_CustomMovementMode InMovementMode) const;
+
+	// ~Begin UCharacterMovementComponent Interface
+	virtual bool IsMovingOnGround() const override;
+	virtual bool CanCrouchInCurrentState() const override;
+	// ~End UCharacterMovementComponent Interface
+
 protected:
 	// ~Begin UCharacterMovementComponent Interface
 	/** 重写预测 */
@@ -108,7 +132,27 @@ protected:
 	 * 如果不需要，请改为绑定到 CharacterOwner 的 OnMovementUpdated 事件，因为该事件是在限定范围的移动更新后触发的。
 	 */
 	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
+
+	/** 在执行实际位置更改之前更新 PerformMovement 中的角色状态 */
+	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
+	
+	/** 移动更新函数只能通过 StartNewPhysics（） 调用 */
+	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	// ~End UCharacterMovementComponent Interface
+
+	// ~Begin UActorComponent Interface
+	virtual void InitializeComponent() override;
+	// ~End UActorComponent Interface
+	
+private:
+	/** 开始滑行 */
+	void EnterSlide();
+	/** 结束滑行 */
+	void ExitSlide();
+	/** 滑行物理计算 */
+	void PhysSlide(float DeltaTime, int32 Iterations);
+	/** 获取滑行面碰撞信息 */
+	bool GetSlideSurface(FHitResult& OutHitResult) const;
 
 protected:
 	/** 冲刺时最大速度 */
@@ -118,4 +162,24 @@ protected:
 	/** 行走最大速度 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Sprint", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
 	float Walk_MaxWalkSpeed;
+
+	
+	/** 滑行最小速度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
+	float Slide_MinSpeed = 350;
+
+	/** 首次进入滑行状态得一个冲力 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide")
+	float Slide_EnterImpulse = 550;
+
+	/** 滑行重力应用值 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide")
+	float Slide_GravityForce = 5000;
+
+	/** 滑行摩檫力 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide")
+	float Slide_Friction = 1.3;
+
+	UPROPERTY(Transient, DuplicateTransient)
+	TObjectPtr<ATD_ZippyCharacter> ZippyCharacterOwner;
 };

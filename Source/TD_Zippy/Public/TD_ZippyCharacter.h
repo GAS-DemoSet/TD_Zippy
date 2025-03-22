@@ -53,6 +53,8 @@ public:
 
 	UTD_CharacterMovementComponent* GetTD_CharacterMovement() const { return TD_CharacterMovementComponent; }
 
+	FCollisionQueryParams GetIgnoreCharacterParams() const;
+
 protected:
 
 	/** Called for movement input */
