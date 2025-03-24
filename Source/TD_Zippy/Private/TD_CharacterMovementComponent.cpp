@@ -9,12 +9,14 @@
 #include "TD_ZippyCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
+#include "Net/UnrealNetwork.h"
 
 UTD_CharacterMovementComponent::FTD_SavedMove_Character::FTD_SavedMove_Character()
 	: Super()
 	, Saved_bWantsToSprint(0)
 	, Saved_bPrevWantsToCrouch(0)
 	, Saved_bWantsToProne(0)
+	, Saved_bWantsToDash(0)
 {
 }
 
@@ -23,6 +25,11 @@ bool UTD_CharacterMovementComponent::FTD_SavedMove_Character::CanCombineWith(con
 	const FTD_SavedMove_Character* NewSaveMove = static_cast<FTD_SavedMove_Character*>(NewMovePtr.Get());
 
 	if (Saved_bWantsToSprint != NewSaveMove->Saved_bWantsToSprint)
+	{
+		return false;
+	}
+
+	if (Saved_bWantsToDash != NewSaveMove->Saved_bWantsToDash)
 	{
 		return false;
 	}
@@ -35,6 +42,10 @@ void UTD_CharacterMovementComponent::FTD_SavedMove_Character::Clear()
 	Super::Clear();
 
 	Saved_bWantsToSprint = 0;
+	Saved_bWantsToDash = 0;
+
+	Saved_bWantsToProne = 0;
+	Saved_bPrevWantsToCrouch = 0;
 }
 
 uint8 UTD_CharacterMovementComponent::FTD_SavedMove_Character::GetCompressedFlags() const
@@ -44,6 +55,11 @@ uint8 UTD_CharacterMovementComponent::FTD_SavedMove_Character::GetCompressedFlag
 	if (Saved_bWantsToSprint)
 	{
 		Result |= FLAG_Sprint;
+	}
+
+	if (Saved_bWantsToDash)
+	{
+		Result |= FLAG_Dash;
 	}
 	
 	return Result;
@@ -61,6 +77,7 @@ void UTD_CharacterMovementComponent::FTD_SavedMove_Character::SetMoveFor(ACharac
 		Saved_bWantsToSprint = TempCMC->Safe_bWantsToSprint;
 		Saved_bPrevWantsToCrouch = TempCMC->Safe_bPrevWantsToCrouch;
 		Saved_bWantsToProne = TempCMC->Safe_bWantsToProne;
+		Saved_bWantsToDash = TempCMC->Safe_bWantsToDash;
 	}
 }
 
@@ -74,6 +91,7 @@ void UTD_CharacterMovementComponent::FTD_SavedMove_Character::PrepMoveFor(AChara
 		TempCMC->Safe_bWantsToSprint = Saved_bWantsToSprint;
 		TempCMC->Safe_bPrevWantsToCrouch = Saved_bPrevWantsToCrouch;
 		TempCMC->Safe_bWantsToProne = Saved_bWantsToProne;
+		TempCMC->Safe_bWantsToDash = Saved_bWantsToDash;
 	}
 }
 
@@ -124,6 +142,27 @@ void UTD_CharacterMovementComponent::CrouchReleased()
 {
 	// 取消进入爬行状态句柄
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_EnterProne);
+}
+
+void UTD_CharacterMovementComponent::DashPressed()
+{
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime - DashStartTime >= DashCooldownDuration)
+	{
+		Safe_bWantsToDash = true;
+	}
+	else
+	{
+		// 每次按下都会执行冲刺，但是如果在冷却期内的话，执行将被延迟到下一个执行阶段
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle_DashCooldown, this, &UTD_CharacterMovementComponent::OnDashCooldownFinished, DashCooldownDuration - (CurrentTime - DashStartTime));
+	}
+}
+
+void UTD_CharacterMovementComponent::DashReleased()
+{
+	// 松开按键后将取消之前的延迟执行
+	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashCooldown);
+	Safe_bWantsToDash = false;
 }
 
 bool UTD_CharacterMovementComponent::IsCustomMovementMode(ETD_CustomMovementMode InMovementMode) const
@@ -212,6 +251,8 @@ void UTD_CharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 	// 此处仅同步到了服务端
 	Safe_bWantsToSprint = (Flags & FTD_SavedMove_Character::FLAG_Sprint) != 0;
 	// Print_Log_NetRole(this->GetOwner(), TD_Log_CMC_Debug, Warning, *FString::Printf(TEXT("UpdateFromCompressedFlags: Safe_bWantsToSprint=%s"), Safe_bWantsToSprint ? TEXT("true") : TEXT("false")));
+
+	Safe_bWantsToDash = (Flags & FTD_SavedMove_Character::FLAG_Dash) != 0;
 }
 
 void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity)
@@ -223,6 +264,7 @@ void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const
 
 void UTD_CharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
+	// Slide
 	if (MovementMode == MOVE_Walking && !bWantsToCrouch && Safe_bPrevWantsToCrouch)
 	{
 		if (CanSlide())
@@ -230,12 +272,12 @@ void UTD_CharacterMovementComponent::UpdateCharacterStateBeforeMovement(float De
 			SetMovementMode(MOVE_Custom, CMOVE_Slide);
 		}
 	}
-
 	if (IsCustomMovementMode(CMOVE_Slide) && !bWantsToCrouch)
 	{
 		SetMovementMode(MOVE_Walking);
 	}
 
+	// Prone
 	if (Safe_bWantsToProne) 
 	{
 		if (CanProne())
@@ -245,10 +287,27 @@ void UTD_CharacterMovementComponent::UpdateCharacterStateBeforeMovement(float De
 		}
 		Safe_bWantsToProne = false;
 	}
-
 	if (IsCustomMovementMode(CMOVE_Prone) && !bWantsToCrouch)
 	{
 		SetMovementMode(MOVE_Walking);
+	}
+
+	// Dash
+	bool bAuthProxy = CharacterOwner->HasAuthority() && !CharacterOwner->IsLocallyControlled(); // 如果是模拟端这个值将为 true
+	if (Safe_bWantsToDash && CanDash())
+	{
+		if (!bAuthProxy || GetWorld()->GetTimeSeconds() - DashStartTime > AuthDashCooldownDuration)
+		{
+			// 执行冲刺行为（权威执行）
+			PerformDash();
+			Safe_bWantsToDash = false;
+			Proxy_bDashStart = !Proxy_bDashStart;
+		}
+		else
+		{
+			// 模拟端行为（作弊）
+			UE_LOG(LogTemp, Warning, TEXT("Client tried to cheat"))
+		}
 	}
 
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
@@ -749,5 +808,51 @@ void UTD_CharacterMovementComponent::PhysProne(float deltaTime, int32 Iterations
 	{
 		MaintainHorizontalGroundVelocity();
 	}
+}
+#pragma endregion
+
+
+#pragma region Dash
+void UTD_CharacterMovementComponent::OnDashCooldownFinished()
+{
+	Safe_bWantsToDash = true;
+}
+
+bool UTD_CharacterMovementComponent::CanDash() const
+{
+	return IsWalking() && !IsCrouching();
+}
+
+void UTD_CharacterMovementComponent::PerformDash()
+{
+	// 记录本次冲刺执行时间
+	DashStartTime = GetWorld()->GetTimeSeconds();
+
+	// 获取冲刺方向
+	FVector DashDirection = (Acceleration.IsNearlyZero() ? UpdatedComponent->GetForwardVector() : Acceleration).GetSafeNormal2D();
+	Velocity = DashImpulse * (DashDirection + FVector::UpVector * .1f);
+
+	FQuat NewRotation = FRotationMatrix::MakeFromXZ(DashDirection, FVector::UpVector).ToQuat();
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(FVector::ZeroVector, NewRotation, false, Hit);
+
+	SetMovementMode(MOVE_Falling);
+
+	DashStartDelegate.Broadcast();
+}
+#pragma endregion
+
+
+#pragma region Replication
+void UTD_CharacterMovementComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME_CONDITION(UTD_CharacterMovementComponent, Proxy_bDashStart, COND_SkipOwner)
+}
+
+void UTD_CharacterMovementComponent::OnRep_DashStart()
+{
+	DashStartDelegate.Broadcast();
 }
 #pragma endregion

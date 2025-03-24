@@ -6,6 +6,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TD_CharacterMovementComponent.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDashStartDelegate);
+
 UENUM(BlueprintType)
 enum ETD_CustomMovementMode : int
 {
@@ -36,7 +38,7 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		enum CompressedFlags
 		{
 			FLAG_Sprint			= 0x10,
-			FLAG_Custom_1		= 0x20,
+			FLAG_Dash			= 0x20,
 			FLAG_Custom_2		= 0x40,
 			FLAG_Custom_3		= 0x80,
 		};
@@ -46,7 +48,9 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		
 		uint8 Saved_bPrevWantsToCrouch : 1;
 
-		uint8 Saved_bWantsToProne:1;
+		uint8 Saved_bWantsToProne : 1;
+
+		uint8 Saved_bWantsToDash : 1;
 
 	public:
 
@@ -101,6 +105,9 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 
 	/** 是否想要爬行 */
 	bool Safe_bWantsToProne;
+
+	/**  */
+	bool Safe_bWantsToDash;
 	/////////////////////////////// End ///////////////////////////////
 	
 
@@ -128,8 +135,17 @@ public:
 	void CrouchPressed();
 	UFUNCTION(BlueprintCallable)
 	void CrouchReleased();
+
+	/**
+	 * 
+	 */
+	UFUNCTION(BlueprintCallable)
+	void DashPressed();
+	UFUNCTION(BlueprintCallable)
+	void DashReleased();
 	/////////////////////////////// End ///////////////////////////////
 
+	
 	/** 是否为自定义模式移动 */
 	UFUNCTION(BlueprintCallable)
 	bool IsCustomMovementMode(ETD_CustomMovementMode InMovementMode) const;
@@ -137,6 +153,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsMovementMode(EMovementMode InMovementMode) const { return InMovementMode == MovementMode; }
 
+	
 	// ~Begin UCharacterMovementComponent Interface
 	virtual bool IsMovingOnGround() const override;
 	virtual bool CanCrouchInCurrentState() const override;
@@ -168,10 +185,15 @@ protected:
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	// ~End UCharacterMovementComponent Interface
 
+	
 	// ~Begin UActorComponent Interface
 	virtual void InitializeComponent() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// ~End UActorComponent Interface
+
+	// ~Begin UObject Interface
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	// ~End UObject Interface
 	
 private:
 	///////////////////// ~Begin Slide /////////////////////
@@ -185,6 +207,7 @@ private:
 	bool CanSlide() const;
 	///////////////////// ~End Slide /////////////////////
 
+	
 	///////////////////// ~Begin Prone /////////////////////
 	void TryEnterProne() { Safe_bWantsToProne = true; }
 	UFUNCTION(Server, Reliable)
@@ -196,6 +219,27 @@ private:
 	void PhysProne(float deltaTime, int32 Iterations);
 	///////////////////// ~End Prone /////////////////////
 
+
+	///////////////////// ~Begin Dash /////////////////////
+	/** 冲刺冷却结束（冲刺将延迟执行，等待冷却完毕/上一个冲刺状态结束后再次执行） */
+	void OnDashCooldownFinished();
+
+	/** 是否可以冲刺 */
+	bool CanDash() const;
+
+	/** 执行冲刺事件 */
+	void PerformDash();
+
+	/**  */
+	UFUNCTION()
+	void OnRep_DashStart();
+	///////////////////// ~End Dash /////////////////////
+
+public:
+	/** 开始冲刺动作（通知客户端事件：例如播放蒙太奇） */
+	UPROPERTY(BlueprintAssignable, Category="Character Movement: Dash")
+	FDashStartDelegate DashStartDelegate;
+	
 protected:
 	///////////////////// ~Begin Sprint /////////////////////
 	/** 冲刺时最大速度 */
@@ -203,6 +247,7 @@ protected:
 	float MaxSprintSpeed = 1000.f;
 	///////////////////// ~End Sprint /////////////////////
 
+	
 	///////////////////// ~Begin Slide /////////////////////
 	/** 滑行最小速度 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
@@ -229,6 +274,7 @@ protected:
 	float BrakingDecelerationSliding = 1000.f;
 	///////////////////// ~End Slide /////////////////////
 
+	
 	///////////////////// ~Begin Prone /////////////////////
 	/** 进入爬行状态得持续时间 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Prone")
@@ -249,6 +295,28 @@ protected:
 	FTimerHandle TimerHandle_EnterProne;
 	///////////////////// ~End Prone /////////////////////
 
+
+	///////////////////// ~Begin Dash /////////////////////
+	/** 向前冲刺的冲力 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")
+	float DashImpulse = 1000.f;
+
+	/** 冲刺冷却时间 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")
+	float DashCooldownDuration = 1.f;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")
+	float AuthDashCooldownDuration = .9f;
+
+	/** 开始冲刺（同步多端知晓） */
+	UPROPERTY(ReplicatedUsing = OnRep_DashStart)
+	bool Proxy_bDashStart;
+	
+	float DashStartTime = 0.f;
+	FTimerHandle TimerHandle_DashCooldown;
+	///////////////////// ~End Dash /////////////////////
+	
 	UPROPERTY(Transient, DuplicateTransient)
 	TObjectPtr<ATD_ZippyCharacter> ZippyCharacterOwner;
 };

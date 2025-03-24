@@ -21,6 +21,7 @@ ATD_ZippyCharacter::ATD_ZippyCharacter(const FObjectInitializer& ObjectInitializ
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UTD_CharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	TD_CharacterMovementComponent = Cast<UTD_CharacterMovementComponent>(GetCharacterMovement());
+	TD_CharacterMovementComponent->SetIsReplicated(true);
 	
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
