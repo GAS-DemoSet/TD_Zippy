@@ -11,6 +11,7 @@ enum ETD_CustomMovementMode : int
 {
 	CMOVE_None			UMETA(Hidden),
 	CMOVE_Slide			UMETA(DisplayName = "Slide"),
+	CMOVE_Prone			UMETA(DisplayName = "Prone"),
 	CMOVE_MAX			UMETA(Hidden),
 };
 
@@ -32,9 +33,20 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		typedef FSavedMove_Character Super;
 		
 	public:
+		enum CompressedFlags
+		{
+			FLAG_Sprint			= 0x10,
+			FLAG_Custom_1		= 0x20,
+			FLAG_Custom_2		= 0x40,
+			FLAG_Custom_3		= 0x80,
+		};
+
+		
 		uint8 Saved_bWantsToSprint : 1;
 		
-		uint8 Saved_bPrevWantsToCrouch:1;
+		uint8 Saved_bPrevWantsToCrouch : 1;
+
+		uint8 Saved_bWantsToProne:1;
 
 	public:
 
@@ -86,6 +98,9 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 
 	/**  */
 	bool Safe_bPrevWantsToCrouch = false;
+
+	/** 是否想要爬行 */
+	bool Safe_bWantsToProne;
 	/////////////////////////////// End ///////////////////////////////
 	
 
@@ -105,18 +120,28 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SprintReleased();
 
-	/** 触发蹲伏 */
+	/** 触发蹲伏
+	 * 1.双击进入滑行（速度需要达到一定的阈值）
+	 * 2.长按进入爬行状态
+	 */
 	UFUNCTION(BlueprintCallable)
 	void CrouchPressed();
+	UFUNCTION(BlueprintCallable)
+	void CrouchReleased();
 	/////////////////////////////// End ///////////////////////////////
 
 	/** 是否为自定义模式移动 */
 	UFUNCTION(BlueprintCallable)
 	bool IsCustomMovementMode(ETD_CustomMovementMode InMovementMode) const;
 
+	UFUNCTION(BlueprintPure)
+	bool IsMovementMode(EMovementMode InMovementMode) const { return InMovementMode == MovementMode; }
+
 	// ~Begin UCharacterMovementComponent Interface
 	virtual bool IsMovingOnGround() const override;
 	virtual bool CanCrouchInCurrentState() const override;
+	virtual float GetMaxSpeed() const override;
+	virtual float GetMaxBrakingDeceleration() const override;
 	// ~End UCharacterMovementComponent Interface
 
 protected:
@@ -138,47 +163,91 @@ protected:
 	
 	/** 移动更新函数只能通过 StartNewPhysics（） 调用 */
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
+
+	/** 在 MovementMode 更改后调用。Base 实现对启动某些模式进行特殊处理，然后通知 CharacterOwner。 */
+	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	// ~End UCharacterMovementComponent Interface
 
 	// ~Begin UActorComponent Interface
 	virtual void InitializeComponent() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	// ~End UActorComponent Interface
 	
 private:
+	///////////////////// ~Begin Slide /////////////////////
 	/** 开始滑行 */
-	void EnterSlide();
+	void EnterSlide(EMovementMode PrevMode, ETD_CustomMovementMode PrevCustomMode);
 	/** 结束滑行 */
 	void ExitSlide();
 	/** 滑行物理计算 */
 	void PhysSlide(float DeltaTime, int32 Iterations);
-	/** 获取滑行面碰撞信息 */
-	bool GetSlideSurface(FHitResult& OutHitResult) const;
+	/** 是否可以进入滑行状态 */
+	bool CanSlide() const;
+	///////////////////// ~End Slide /////////////////////
+
+	///////////////////// ~Begin Prone /////////////////////
+	void TryEnterProne() { Safe_bWantsToProne = true; }
+	UFUNCTION(Server, Reliable)
+	void Server_EnterProne();
+	
+	void EnterProne(EMovementMode PrevMode, ETD_CustomMovementMode PrevCustomMode);
+	void ExitProne();
+	bool CanProne() const;
+	void PhysProne(float deltaTime, int32 Iterations);
+	///////////////////// ~End Prone /////////////////////
 
 protected:
+	///////////////////// ~Begin Sprint /////////////////////
 	/** 冲刺时最大速度 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Sprint", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
-	float Sprint_MaxWalkSpeed;
+	float MaxSprintSpeed = 1000.f;
+	///////////////////// ~End Sprint /////////////////////
 
-	/** 行走最大速度 */
-	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Sprint", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
-	float Walk_MaxWalkSpeed;
-
-	
+	///////////////////// ~Begin Slide /////////////////////
 	/** 滑行最小速度 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
-	float Slide_MinSpeed = 350;
+	float MinSlideSpeed = 400;
+
+	/** 滑行最小速度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
+	float MaxSlideSpeed = 400;
 
 	/** 首次进入滑行状态得一个冲力 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide")
-	float Slide_EnterImpulse = 550;
+	float SlideEnterImpulse = 550;
 
 	/** 滑行重力应用值 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide")
-	float Slide_GravityForce = 5000;
+	float SlideGravityForce = 5000;
 
 	/** 滑行摩檫力 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide")
-	float Slide_Friction = 1.3;
+	float SlideFrictionFactor = 1.3;
+
+	/** 滑行时的减速制动 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Slide")
+	float BrakingDecelerationSliding = 1000.f;
+	///////////////////// ~End Slide /////////////////////
+
+	///////////////////// ~Begin Prone /////////////////////
+	/** 进入爬行状态得持续时间 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Prone")
+	float ProneEnterHoldDuration = .2f;
+
+	/** 进入爬行得脉冲力 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Prone")
+	float ProneSlideEnterImpulse = 300.f;
+
+	/** 爬行最大速度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Prone", meta=(ClampMin="0", UIMin="0", ForceUnits="cm/s"))
+	float MaxProneSpeed = 300.f;
+
+	/** 爬行时的减速制动 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Prone")
+	float BrakingDecelerationProning = 2500.f;
+
+	FTimerHandle TimerHandle_EnterProne;
+	///////////////////// ~End Prone /////////////////////
 
 	UPROPERTY(Transient, DuplicateTransient)
 	TObjectPtr<ATD_ZippyCharacter> ZippyCharacterOwner;
