@@ -18,6 +18,7 @@ enum ETD_CustomMovementMode : int
 };
 
 class ATD_ZippyCharacter;
+class UAnimMontage;
 
 /**
  * 
@@ -297,9 +298,13 @@ protected:
 
 
 	///////////////////// ~Begin Dash /////////////////////
-	/** 向前冲刺的冲力 */
+	/** 向前冲刺的冲力（更改为根运动） */
+	// UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")
+	// float DashImpulse = 1000.f;
+
+	/** 冲刺蒙太奇动画 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")
-	float DashImpulse = 1000.f;
+	TObjectPtr<UAnimMontage> DashMontage;
 
 	/** 冲刺冷却时间 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")

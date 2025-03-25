@@ -258,6 +258,12 @@ void UTD_CharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 void UTD_CharacterMovementComponent::OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity)
 {
 	Super::OnMovementUpdated(DeltaSeconds, OldLocation, OldVelocity);
+
+	// 如果在飞行状态并且没有根运动的状态下即切换为行走，最初是为了在根运动冲结束后将状态更正。
+	if (IsMovementMode(MOVE_Flying) && !HasRootMotionSources())
+	{
+		SetMovementMode(MOVE_Walking);
+	}
 	
 	Safe_bPrevWantsToCrouch = bWantsToCrouch;
 }
@@ -820,7 +826,7 @@ void UTD_CharacterMovementComponent::OnDashCooldownFinished()
 
 bool UTD_CharacterMovementComponent::CanDash() const
 {
-	return IsWalking() && !IsCrouching();
+	return IsWalking() && !IsCrouching() || IsFalling();
 }
 
 void UTD_CharacterMovementComponent::PerformDash()
@@ -828,15 +834,18 @@ void UTD_CharacterMovementComponent::PerformDash()
 	// 记录本次冲刺执行时间
 	DashStartTime = GetWorld()->GetTimeSeconds();
 
+	// 修改为根运动方式
 	// 获取冲刺方向
-	FVector DashDirection = (Acceleration.IsNearlyZero() ? UpdatedComponent->GetForwardVector() : Acceleration).GetSafeNormal2D();
-	Velocity = DashImpulse * (DashDirection + FVector::UpVector * .1f);
+	// FVector DashDirection = (Acceleration.IsNearlyZero() ? UpdatedComponent->GetForwardVector() : Acceleration).GetSafeNormal2D();
+	// Velocity = DashImpulse * (DashDirection + FVector::UpVector * .1f);
+	//
+	// FQuat NewRotation = FRotationMatrix::MakeFromXZ(DashDirection, FVector::UpVector).ToQuat();
+	// FHitResult Hit;
+	// SafeMoveUpdatedComponent(FVector::ZeroVector, NewRotation, false, Hit);
+	// SetMovementMode(MOVE_Falling);
 
-	FQuat NewRotation = FRotationMatrix::MakeFromXZ(DashDirection, FVector::UpVector).ToQuat();
-	FHitResult Hit;
-	SafeMoveUpdatedComponent(FVector::ZeroVector, NewRotation, false, Hit);
-
-	SetMovementMode(MOVE_Falling);
+	// SetMovementMode(MOVE_Flying);
+	CharacterOwner->PlayAnimMontage(DashMontage);
 
 	DashStartDelegate.Broadcast();
 }
@@ -853,6 +862,7 @@ void UTD_CharacterMovementComponent::GetLifetimeReplicatedProps(TArray<FLifetime
 
 void UTD_CharacterMovementComponent::OnRep_DashStart()
 {
+	CharacterOwner->PlayAnimMontage(DashMontage);
 	DashStartDelegate.Broadcast();
 }
 #pragma endregion
