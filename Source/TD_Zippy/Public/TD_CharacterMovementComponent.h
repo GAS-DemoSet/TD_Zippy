@@ -12,8 +12,13 @@ UENUM(BlueprintType)
 enum ETD_CustomMovementMode : int
 {
 	CMOVE_None			UMETA(Hidden),
+
+	/** 滑行功能 */
 	CMOVE_Slide			UMETA(DisplayName = "Slide"),
+
+	/** 爬行 */
 	CMOVE_Prone			UMETA(DisplayName = "Prone"),
+
 	CMOVE_MAX			UMETA(Hidden),
 };
 
@@ -44,14 +49,16 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 			FLAG_Custom_3		= 0x80,
 		};
 
-		
+		// flags
 		uint8 Saved_bWantsToSprint : 1;
-		
-		uint8 Saved_bPrevWantsToCrouch : 1;
-
-		uint8 Saved_bWantsToProne : 1;
-
 		uint8 Saved_bWantsToDash : 1;
+		uint8 Saved_bPressedZippyJump:1;
+
+		// Other Variables
+		uint8 Saved_bPrevWantsToCrouch : 1;
+		uint8 Saved_bWantsToProne : 1;
+		uint8 Saved_bHadAnimRootMotion:1;
+		uint8 Saved_bTransitionFinished:1;
 
 	public:
 
@@ -63,13 +70,24 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		/** 清除已保存的移动属性，以便可以重新使用。 */
 		virtual void Clear() override;
 		
-		/** 返回一个包含编码的特殊移动信息（跳跃、蹲伏等）的字节 */
+		/**
+		 * 返回一个包含编码的特殊移动信息（跳跃、蹲伏等）的字节。
+		 * 压缩需要发送服务器的状态值。
+		 */
 		virtual uint8 GetCompressedFlags() const override;
 
-		/** 调用以设置此保存的移动（最初创建时）以进行预测性更正。 */
+		/**
+		 * 调用以设置此保存的移动（最初创建时）以进行预测性更正。
+		 * 在最开始本地预测时保存状态，一帧只调用一次。
+		 */
 		virtual void SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData) override;
 
-		/** 在 ClientUpdatePosition 使用此 SavedMove 进行预测性更正之前调用 */
+		/**
+		 * 仅在客户端运行，影响客户端的 CMC，并且只有客户端需要回滚重演之前保存下来的 SaveMode 时才会调用。
+		 * 只有在收到服务器校正、需要回滚预测时，才会用它来逐帧还原状态并重演。
+		 * 当客户端“预测回滚”时，使用之前保存的 SavedMove，把角色状态还原成当时的状态，以重新模拟那一帧。
+		 * 在 ClientUpdatePosition 使用此 SavedMove 进行预测性更正之前调用。
+		 */
 		virtual void PrepMoveFor(ACharacter* C) override;
 	};
 
@@ -98,17 +116,19 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 	 * 以下为安全得移动属性变量，可以放心在移动函数中使用
 	 * 移动函数中不可使用非安全移动变量
 	 */
+	// Flags
 	/** 是否想要冲刺 */
 	bool Safe_bWantsToSprint = false;
-
-	/**  */
-	bool Safe_bPrevWantsToCrouch = false;
-
 	/** 是否想要爬行 */
 	bool Safe_bWantsToProne;
-
-	/**  */
+	/** 是否想要冲刺 */
 	bool Safe_bWantsToDash;
+
+	/** 角色上一帧的状态（上一帧是否为蹲伏状态） */
+	bool Safe_bPrevWantsToCrouch = false;
+
+	bool Safe_bHadAnimRootMotion;
+	bool Safe_bTransitionFinished;
 	/////////////////////////////// End ///////////////////////////////
 	
 
@@ -168,21 +188,40 @@ protected:
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	virtual FNetworkPredictionData_Server* GetPredictionData_Server() const override;
 
-	/** 从已保存的 move 中解压缩 flag 并相应地设置 state。请参阅 FSavedMove_Character。 */
+	/**
+	 * 收到客户端移动 RPC 数据（SaveMove）后调用
+	 * 从已保存的 move 中解压缩 flag 并相应地设置 state。请参阅 FSavedMove_Character。
+	 * 影响服务器的 CMC
+	 */
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	/**
 	 * 在移动更新结束时触发的事件。如果启用了有范围的移动更新（bEnableScopedMovementUpdates），则这是在这样的范围内。
 	 * 如果不需要，请改为绑定到 CharacterOwner 的 OnMovementUpdated 事件，因为该事件是在限定范围的移动更新后触发的。
+	 * 
+	 * 这个函数在每一帧角色移动完成后被调用，用于对移动之后的角色状态做进一步的处理。比如你可以在这里添加特效、动画更新、同步网络状态等。
 	 */
 	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
-
-	/** 在执行实际位置更改之前更新 PerformMovement 中的角色状态 */
+	/**
+	 * 在执行实际位置更改之前更新 PerformMovement 中的角色状态。
+	 *
+	 * 这个函数在每一帧角色移动之前被调用，用于更新角色当前的状态，比如是否应该开始下落、游泳，或者切换移动模式等。
+	 */
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
-	
-	/** 移动更新函数只能通过 StartNewPhysics（） 调用 */
+	/**
+	 * 位置更改后，在 PerformMovement 中更新角色状态。在此之后会进行一些轮换更新。
+	 * 这个函数在每一帧角色移动后被调用
+	 */
+	virtual void UpdateCharacterStateAfterMovement(float DeltaSeconds) override;
+	/**
+	 * 移动更新函数只能通过 StartNewPhysics（） 调用。
+	 */
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
-
-	/** 在 MovementMode 更改后调用。Base 实现对启动某些模式进行特殊处理，然后通知 CharacterOwner。 */
+	/**
+	 * 在 MovementMode 更改后调用。Base 实现对启动某些模式进行特殊处理，然后通知 CharacterOwner。
+	 *
+	 * 在移动模式发生变化时调用，比如从行走变成游泳、飞行、下落等。可以在这里执行状态切换时的逻辑，比如播放转换动画、初始化某些参数。
+	* 当 SetMovementMode 被调用并且移动模式发生了真正的改变时，比如：从 MOVE_Walking → MOVE_Falling。
+	 */
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	// ~End UCharacterMovementComponent Interface
 
@@ -236,6 +275,27 @@ private:
 	void OnRep_DashStart();
 	///////////////////// ~End Dash /////////////////////
 
+	///////////////////// ~Begin Mantle /////////////////////
+
+	/**  */
+	bool TryMantle();
+	
+	/**  */
+	FVector GetMantleStartLocation(FHitResult FrontHit, FHitResult SurfaceHit, bool bTallMantle) const;
+	
+	UFUNCTION()
+	void OnRep_ShortMantle();
+	UFUNCTION()
+	void OnRep_TallMantle();
+	///////////////////// ~Begin Mantle /////////////////////
+
+private:
+	bool IsServer() const;
+	/** 返回按组件缩放缩放的胶囊体半径。 */
+	float CapR() const;
+	/** 返回按组件缩放缩放的胶囊体半高。这包括圆柱体和半球帽。 */
+	float CapHH() const;
+	
 public:
 	/** 开始冲刺动作（通知客户端事件：例如播放蒙太奇） */
 	UPROPERTY(BlueprintAssignable, Category="Character Movement: Dash")
@@ -310,7 +370,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")
 	float DashCooldownDuration = 1.f;
 
-	/**  */
+	/** 冲刺冷却时间，并非可以连续触发冲刺。 */
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Dash")
 	float AuthDashCooldownDuration = .9f;
 
@@ -321,6 +381,68 @@ protected:
 	float DashStartTime = 0.f;
 	FTimerHandle TimerHandle_DashCooldown;
 	///////////////////// ~End Dash /////////////////////
+
+		
+	///////////////////// ~Begin Mantle /////////////////////
+	/** 翻墙时允许距离墙的最大距离，超过这个距离不会进行翻墙 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	float MantleMaxDistance = 200;
+
+	/** 翻墙时最高可以攀上的高度，超高这个高度禁止翻墙 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	float MantleReachHeight = 50;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	float MinMantleDepth = 30;
+
+	/** 斜坡与地面所形成的夹角（允许角色翻越墙体的最小夹角度） */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	float MantleMinWallSteepnessAngle = 75;
+
+	/** 即将爬上的墙面与地面的角度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	float MantleMaxSurfaceAngle = 40;
+
+	/** 角色正前方与斜坡所形成的夹角 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	float MantleMaxAlignmentAngle = 45;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	UAnimMontage* TallMantleMontage;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	UAnimMontage* TransitionTallMantleMontage;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	UAnimMontage* ProxyTallMantleMontage;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	UAnimMontage* ShortMantleMontage;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	UAnimMontage* TransitionShortMantleMontage;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Mantle")
+	UAnimMontage* ProxyShortMantleMontage;
+
+	UPROPERTY(ReplicatedUsing=OnRep_ShortMantle)
+	bool Proxy_bShortMantle;
+	UPROPERTY(ReplicatedUsing=OnRep_TallMantle)
+	bool Proxy_bTallMantle;
+
+	TSharedPtr<FRootMotionSource_MoveToForce> TransitionRMS;
+	UPROPERTY(Transient)
+	UAnimMontage* TransitionQueuedMontage;
+	float TransitionQueuedMontageSpeed;
+	uint16 TransitionRMS_ID;
+	///////////////////// ~End Mantle /////////////////////
 	
 	UPROPERTY(Transient, DuplicateTransient)
 	TObjectPtr<ATD_ZippyCharacter> ZippyCharacterOwner;

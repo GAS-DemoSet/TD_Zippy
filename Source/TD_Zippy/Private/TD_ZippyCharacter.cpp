@@ -97,6 +97,20 @@ void ATD_ZippyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	}
 }
 
+void ATD_ZippyCharacter::Jump()
+{
+	Super::Jump();
+
+	bPressedZippyJump = true;
+	bPressedJump = false;
+}
+
+void ATD_ZippyCharacter::StopJumping()
+{
+	Super::StopJumping();
+	bPressedZippyJump = false;
+}
+
 FCollisionQueryParams ATD_ZippyCharacter::GetIgnoreCharacterParams() const
 {
 	FCollisionQueryParams Params;

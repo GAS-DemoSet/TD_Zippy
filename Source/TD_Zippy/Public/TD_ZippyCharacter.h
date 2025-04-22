@@ -55,6 +55,12 @@ public:
 
 	FCollisionQueryParams GetIgnoreCharacterParams() const;
 
+	virtual void Jump() override;
+	virtual void StopJumping() override;
+	
+public:
+	bool bPressedZippyJump;
+
 protected:
 
 	/** Called for movement input */
@@ -62,12 +68,8 @@ protected:
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
-			
-
-protected:
-
+	
 	virtual void NotifyControllerChanged() override;
-
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 public:
