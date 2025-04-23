@@ -57,8 +57,9 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 		// Other Variables
 		uint8 Saved_bPrevWantsToCrouch : 1;
 		uint8 Saved_bWantsToProne : 1;
-		uint8 Saved_bHadAnimRootMotion:1;
-		uint8 Saved_bTransitionFinished:1;
+		uint8 Saved_bHadAnimRootMotion : 1;
+		uint8 Saved_bTransitionFinished : 1;
+		uint8 Saved_bWallRunIsRight : 1;
 
 	public:
 
@@ -129,6 +130,9 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 
 	bool Safe_bHadAnimRootMotion;
 	bool Safe_bTransitionFinished;
+
+	/** 当前时左墙跑还是右墙跑 */
+	bool Safe_bWallRunIsRight;
 	/////////////////////////////// End ///////////////////////////////
 	
 
@@ -174,6 +178,10 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsMovementMode(EMovementMode InMovementMode) const { return InMovementMode == MovementMode; }
 
+	UFUNCTION(BlueprintPure)
+	bool IsWallRunning() const { return IsCustomMovementMode(CMOVE_WallRun); }
+	UFUNCTION(BlueprintPure)
+	bool WallRunningIsRight() const { return Safe_bWallRunIsRight; }
 	
 	// ~Begin UCharacterMovementComponent Interface
 	virtual bool IsMovingOnGround() const override;
@@ -223,6 +231,12 @@ protected:
 	* 当 SetMovementMode 被调用并且移动模式发生了真正的改变时，比如：从 MOVE_Walking → MOVE_Falling。
 	 */
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+
+	/** 如果当前移动状态允许尝试跳跃，则返回 true。由 Character：：CanJump（） 使用。 */
+	virtual bool CanAttemptJump() const override;
+
+	/** 执行 jump 。当检测到跳跃时由角色调用，因为 Character->bPressedJump 为 true。检查 Character->CanJump（）。请注意，您通常应该通过 Character：：Jump（） 触发跳转。 */
+	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
 	// ~End UCharacterMovementComponent Interface
 
 	
@@ -288,6 +302,11 @@ private:
 	UFUNCTION()
 	void OnRep_TallMantle();
 	///////////////////// ~Begin Mantle /////////////////////
+
+	///////////////////// ~Begin Wall Run /////////////////////
+	bool TryWallRun();
+	void PhysWallRun(float deltaTime, int32 Iterations);
+	///////////////////// ~Begin Wall Run /////////////////////
 
 private:
 	bool IsServer() const;
@@ -443,6 +462,41 @@ protected:
 	float TransitionQueuedMontageSpeed;
 	uint16 TransitionRMS_ID;
 	///////////////////// ~End Mantle /////////////////////
+
+	
+	///////////////////// ~Begin Wall Run /////////////////////
+	/** 最小墙跑速度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	float MinWallRunSpeed = 200.f;
+
+	/** 最大墙跑速度 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	float MaxWallRunSpeed = 800.f;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	float MaxVerticalWallRunSpeed = 200.f;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	float WallRunPullAwayAngle = 75.f;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	float WallAttractionForce = 200.f;
+
+	/** 最小的墙跑高度，低于这个高度时，将结束墙跑 */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	float MinWallRunHeight = 50.f;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	TObjectPtr<UCurveFloat> WallRunGravityScaleCurve;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
+	float WallJumpOffForce = 300.f;
+	///////////////////// ~End Wall Run /////////////////////
 	
 	UPROPERTY(Transient, DuplicateTransient)
 	TObjectPtr<ATD_ZippyCharacter> ZippyCharacterOwner;
