@@ -19,6 +19,9 @@ enum ETD_CustomMovementMode : int
 	/** 爬行 */
 	CMOVE_Prone			UMETA(DisplayName = "Prone"),
 
+	/** 墙跑 */
+	CMOVE_WallRun		UMETA(DisplayName = "Wall Run"),
+
 	CMOVE_MAX			UMETA(Hidden),
 };
 
