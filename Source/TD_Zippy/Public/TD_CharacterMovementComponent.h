@@ -22,6 +22,12 @@ enum ETD_CustomMovementMode : int
 	/** 墙跑 */
 	CMOVE_WallRun		UMETA(DisplayName = "Wall Run"),
 
+	/** 挂墙 */
+	CMOVE_Hang			UMETA(DisplayName = "Hang"),
+
+	/** 爬墙 */
+	CMOVE_Climb			UMETA(DisplayName = "Climb"),
+
 	CMOVE_MAX			UMETA(Hidden),
 };
 
@@ -137,7 +143,13 @@ class TD_ZIPPY_API UTD_CharacterMovementComponent : public UCharacterMovementCom
 	/** 当前时左墙跑还是右墙跑 */
 	bool Safe_bWallRunIsRight;
 	/////////////////////////////// End ///////////////////////////////
-	
+
+	TSharedPtr<FRootMotionSource_MoveToForce> TransitionRMS;
+	FString TransitionName;
+	UPROPERTY(Transient)
+	UAnimMontage* TransitionQueuedMontage;
+	float TransitionQueuedMontageSpeed;
+	uint16 TransitionRMS_ID;
 
 public:
 	UTD_CharacterMovementComponent();
@@ -171,6 +183,11 @@ public:
 	void DashPressed();
 	UFUNCTION(BlueprintCallable)
 	void DashReleased();
+
+	UFUNCTION(BlueprintCallable)
+	void ClimbPressed();
+	UFUNCTION(BlueprintCallable)
+	void ClimbReleased();
 	/////////////////////////////// End ///////////////////////////////
 
 	
@@ -185,6 +202,10 @@ public:
 	bool IsWallRunning() const { return IsCustomMovementMode(CMOVE_WallRun); }
 	UFUNCTION(BlueprintPure)
 	bool WallRunningIsRight() const { return Safe_bWallRunIsRight; }
+	UFUNCTION(BlueprintPure)
+	bool IsHanging() const { return IsCustomMovementMode(CMOVE_Hang); }
+	UFUNCTION(BlueprintPure)
+	bool IsClimbing() const { return IsCustomMovementMode(CMOVE_Climb); }
 	
 	// ~Begin UCharacterMovementComponent Interface
 	virtual bool IsMovingOnGround() const override;
@@ -304,13 +325,20 @@ private:
 	void OnRep_ShortMantle();
 	UFUNCTION()
 	void OnRep_TallMantle();
-	///////////////////// ~Begin Mantle /////////////////////
+	///////////////////// ~End Mantle /////////////////////
 
 	///////////////////// ~Begin Wall Run /////////////////////
 	bool TryWallRun();
 	void PhysWallRun(float deltaTime, int32 Iterations);
-	///////////////////// ~Begin Wall Run /////////////////////
+	///////////////////// ~End Wall Run /////////////////////
 
+	///////////////////// ~Begin Climb /////////////////////
+	bool TryHang();
+
+	bool TryClimb();
+	void PhysClimb(float deltaTime, int32 Iterations);
+	///////////////////// ~End Climb /////////////////////
+	
 private:
 	bool IsServer() const;
 	/** 返回按组件缩放缩放的胶囊体半径。 */
@@ -458,12 +486,6 @@ protected:
 	bool Proxy_bShortMantle;
 	UPROPERTY(ReplicatedUsing=OnRep_TallMantle)
 	bool Proxy_bTallMantle;
-
-	TSharedPtr<FRootMotionSource_MoveToForce> TransitionRMS;
-	UPROPERTY(Transient)
-	UAnimMontage* TransitionQueuedMontage;
-	float TransitionQueuedMontageSpeed;
-	uint16 TransitionRMS_ID;
 	///////////////////// ~End Mantle /////////////////////
 
 	
@@ -500,6 +522,36 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Wall Run")
 	float WallJumpOffForce = 300.f;
 	///////////////////// ~End Wall Run /////////////////////
+
+	
+	///////////////////// ~Begin Hang /////////////////////
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Hang")
+	UAnimMontage* TransitionHangMontage;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Hang")
+	UAnimMontage* WallJumpMontage;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Hang")
+	float WallJumpForce = 400.f;
+	///////////////////// ~End Hang /////////////////////
+
+	
+	///////////////////// ~Begin Climb /////////////////////
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Climb")
+	float MaxClimbSpeed = 300.f;
+	
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Climb")
+	float BrakingDecelerationClimbing = 1000.f;
+
+	/**  */
+	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Climb")
+	float ClimbReachDistance = 200.f;
+	///////////////////// ~End Climb /////////////////////
 	
 	UPROPERTY(Transient, DuplicateTransient)
 	TObjectPtr<ATD_ZippyCharacter> ZippyCharacterOwner;
